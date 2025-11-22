@@ -1,0 +1,45 @@
+Patient Name: Jennifer Chen
+DOB: 1995-11-08
+SSN: 345-67-8901
+
+Condition: Type 1 Diabetes - Routine Follow-up
+Department: Endocrinology
+Priority: NORMAL
+
+Chief Complaint:
+Routine diabetes management, requesting insulin pump adjustment.
+
+Vital Signs:
+- Blood Pressure: 118/76 mmHg (Normal)
+- Heart Rate: 72 bpm (Normal)
+- BMI: 23.5 (Normal)
+- Temperature: 98.4°F
+
+Lab Results:
+- HbA1c: 6.8% (Good control - Target <7%)
+- Fasting Glucose: 105 mg/dL (Slightly elevated)
+- Random Glucose: 140 mg/dL
+- C-Peptide: <0.1 ng/mL (Confirms Type 1)
+- TSH: 2.1 mIU/L (Normal)
+- Creatinine: 0.9 mg/dL (Normal)
+- Microalbumin: <30 mg/g (Normal)
+- Lipid Panel: Within normal limits
+
+CGM Data (Last 14 days):
+- Time in Range (70-180): 78%
+- Time Below Range: 3%
+- Time Above Range: 19%
+- Average Glucose: 145 mg/dL
+- Glucose Variability: 32% CV
+
+Medical History:
+- Type 1 Diabetes (diagnosed age 12)
+- Hypothyroidism (well-controlled)
+- No complications
+
+Current Medications:
+- Insulin Aspart (Novolog) via pump
+- Levothyroxine 75mcg daily
+
+Recommended Actions:
+Continue current insulin regimen, minor basal rate adjustment for overnight highs, continue quarterly HbA1c monitoring, annual retinal exam scheduled.

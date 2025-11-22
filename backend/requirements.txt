@@ -1,0 +1,14 @@
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic
+pydantic-settings
+celery[redis]==5.3.6
+redis==5.0.1
+python-socketio==5.11.1
+requests==2.31.0
+skyflow==1.10.0
+anthropic==0.18.1
+python-dotenv==1.0.1
+scikit-learn==1.4.0
+python-magic==0.4.27
