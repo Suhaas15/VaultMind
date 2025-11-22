@@ -10,29 +10,24 @@ import {
 } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Star } from 'lucide-react';
-
 interface FeedbackDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     patientId: string;
     patientName: string;
 }
-
 export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: FeedbackDialogProps) {
     const [rating, setRating] = useState(0);
     const [hoveredRating, setHoveredRating] = useState(0);
     const [corrections, setCorrections] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
-
     const handleSubmit = async () => {
         if (rating === 0) {
             alert('Please provide a rating');
             return;
         }
-
         setSubmitting(true);
-
         try {
             const response = await fetch('http://localhost:8000/api/feedback', {
                 method: 'POST',
@@ -46,7 +41,6 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                     summary_quality: rating >= 4 ? 'excellent' : rating >= 3 ? 'good' : 'fair',
                 }),
             });
-
             if (response.ok) {
                 setSubmitted(true);
                 setTimeout(() => {
@@ -65,7 +59,6 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
             setSubmitting(false);
         }
     };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
@@ -75,7 +68,6 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                         Help improve the system by rating the AI summary for {patientName}
                     </DialogDescription>
                 </DialogHeader>
-
                 {submitted ? (
                     <div className="py-8 text-center">
                         <div className="text-green-600 text-lg font-semibold mb-2">✓ Thank you!</div>
@@ -86,7 +78,7 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                 ) : (
                     <>
                         <div className="space-y-4 py-4">
-                            {/* Star Rating */}
+                            { }
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Accuracy Rating</label>
                                 <div className="flex gap-2">
@@ -117,8 +109,7 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                                     {rating === 5 && 'Excellent - Highly accurate'}
                                 </p>
                             </div>
-
-                            {/* Corrections */}
+                            { }
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">
                                     Corrections or Suggestions (Optional)
@@ -131,8 +122,7 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                                     className="resize-none"
                                 />
                             </div>
-
-                            {/* Learning Impact Notice */}
+                            { }
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                 <p className="text-xs text-blue-800">
                                     <strong>🧠 Self-Learning:</strong> Your feedback directly improves the AI.
@@ -140,7 +130,6 @@ export function FeedbackDialog({ open, onOpenChange, patientId, patientName }: F
                                 </p>
                             </div>
                         </div>
-
                         <DialogFooter>
                             <Button
                                 variant="outline"

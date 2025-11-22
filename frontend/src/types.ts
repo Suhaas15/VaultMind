@@ -4,7 +4,6 @@ export interface LabResult {
     date: string
     normal_range: string
 }
-
 export interface Patient {
     id: string
     name_token: string
@@ -27,7 +26,6 @@ export interface Patient {
     cost_usd?: number
     claude_model?: string
 }
-
 export interface AuditLog {
     id: string
     timestamp: string

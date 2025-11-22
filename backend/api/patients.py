@@ -7,31 +7,24 @@ import asyncio
 from ..services.sanity_service import sanity_service
 from ..services.skyflow_service import skyflow_service
 from ..services.agent_service import agent_service
-
-# Try to import Celery task, fallback to None if Redis not available
 try:
     from ..workers.tasks import process_patient_task
     CELERY_AVAILABLE = True
 except Exception:
     CELERY_AVAILABLE = False
     process_patient_task = None
-
-# Import Socket.IO lazily to avoid circular imports
 def get_sio():
     try:
         from ..main import sio
         return sio
     except Exception:
         return None
-
 router = APIRouter()
-
 class LabResult(BaseModel):
     test_name: str
     value: str
     date: str
     normal_range: Optional[str] = None
-
 class PatientCreate(BaseModel):
     name: str
     ssn: str
@@ -42,7 +35,6 @@ class PatientCreate(BaseModel):
     priority: str = "NORMAL"
     assigned_doctor: str = "Unassigned"
     lab_results: List[LabResult] = []
-
 class PatientResponse(BaseModel):
     id: str
     name_token: str
@@ -57,10 +49,8 @@ class PatientResponse(BaseModel):
     tokens_used: Optional[Dict[str, int]] = None
     cost_usd: Optional[float] = None
     claude_model: Optional[str] = None
-
 @router.post("/", response_model=PatientResponse)
 async def create_patient(patient: PatientCreate):
-    # 1. Tokenize PII
     pii_data = {
         "name": patient.name,
         "ssn": patient.ssn,
@@ -68,8 +58,6 @@ async def create_patient(patient: PatientCreate):
         "address": patient.address
     }
     tokens = skyflow_service.tokenize(pii_data)
-    
-    # 2. Store in Sanity (only tokens)
     patient_doc = {
         **tokens,
         "condition": patient.condition,
@@ -80,42 +68,29 @@ async def create_patient(patient: PatientCreate):
     }
     created_patient = sanity_service.create_patient(patient_doc)
     patient_id = created_patient.get('id') or created_patient.get('_id')
-    
-    # Automatically trigger processing (synchronously if Celery not available)
-    # Automatically trigger processing
     try:
         if CELERY_AVAILABLE and process_patient_task:
             try:
-                # Use Celery for async processing
                 process_patient_task.delay(patient_id, patient_doc)
-                # Emit socket event
                 sio = get_sio()
                 if sio:
                     asyncio.create_task(sio.emit('processing_started', {'patientId': patient_id}))
             except Exception as e:
                 print(f"⚠️ Celery task failed (Redis likely down), falling back to sync processing: {e}")
-                # Fallback to synchronous processing
                 sio = get_sio()
                 if sio:
                     await sio.emit('processing_started', {'patientId': patient_id})
-                
                 await agent_service.process_patient(patient_id, patient_doc)
-                
                 if sio:
                     updated_patient = sanity_service.get_patient(patient_id)
                     await sio.emit('patient_processed', {'patientId': patient_id, 'patient': updated_patient})
                 print(f"✅ Patient {patient_id} processed successfully (synchronously)")
         else:
-            # Process synchronously if Celery not available (await to ensure it runs)
             print(f"Processing patient {patient_id} synchronously (Celery not configured)...")
             sio = get_sio()
             if sio:
                 await sio.emit('processing_started', {'patientId': patient_id})
-            
-            # Actually await the processing (don't just create a task)
             await agent_service.process_patient(patient_id, patient_doc)
-            
-            # Emit completion event
             if sio:
                 updated_patient = sanity_service.get_patient(patient_id)
                 await sio.emit('patient_processed', {'patientId': patient_id, 'patient': updated_patient})
@@ -124,7 +99,6 @@ async def create_patient(patient: PatientCreate):
         print(f"❌ Error triggering processing: {e}")
         import traceback
         traceback.print_exc()
-    
     return PatientResponse(
         id=patient_id,
         name_token=created_patient.get('name_token', ''),
@@ -134,18 +108,14 @@ async def create_patient(patient: PatientCreate):
         assigned_doctor=created_patient.get('assigned_doctor', 'Unassigned'),
         processed=created_patient.get('processed', False)
     )
-
 @router.get("/", response_model=Dict[str, Any])
 async def get_patients(page: int = 1, limit: int = 50):
     patients = sanity_service.get_patients()
-    
-    # Calculate pagination
     total = len(patients)
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
     paginated_patients = patients[start_idx:end_idx]
     total_pages = (total + limit - 1) // limit if total > 0 else 1
-    
     return {
         "patients": [
             {
@@ -172,17 +142,13 @@ async def get_patients(page: int = 1, limit: int = 50):
         "pages": total_pages,
         "limit": limit
     }
-
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(patient_id: str):
     patient = sanity_service.get_patient(patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-        
-    # Note: PatientResponse model doesn't include ssn_token, dob_token, etc.
-    # But we can still access them from the raw patient object for decrypt endpoint
     return PatientResponse(
-        id=patient.get('_id', patient.get('id', patient_id)),  # Use _id from Sanity, fallback to id or patient_id
+        id=patient.get('_id', patient.get('id', patient_id)),  
         name_token=patient.get('name_token', ''),
         condition=patient.get('condition', ''),
         department=patient.get('department', 'General'),
@@ -196,43 +162,25 @@ async def get_patient(patient_id: str):
         cost_usd=patient.get('cost_usd'),
         claude_model=patient.get('claude_model')
     )
-
 @router.delete("/reset")
 async def reset_system():
-    """
-    Destructive action: Deletes all patients from the system.
-    Used for "Start from Scratch" functionality.
-    """
     try:
         sanity_service.delete_all_patients()
         return {"status": "success", "message": "All patient data deleted"}
     except Exception as e:
         print(f"Reset error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/{patient_id}/decrypt")
 async def decrypt_patient(patient_id: str, body: Dict[str, Any] = {}):
-    """
-    Decrypt PII tokens to plaintext (requires proper authentication).
-    This uses Skyflow's detokenization API.
-    """
-    # Get patient to find tokens
     patient = sanity_service.get_patient(patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-    
-    # Log available tokens for debugging
     print(f"🔍 Decrypting patient {patient_id}")
     print(f"   Available tokens: name_token={bool(patient.get('name_token'))}, ssn_token={bool(patient.get('ssn_token'))}, dob_token={bool(patient.get('dob_token'))}, address_token={bool(patient.get('address_token'))}")
-    
-    # Decrypt tokens using Skyflow (with error handling for each field)
     decrypted_data = {}
     errors = {}
-    
-    # Helper function to check if token exists and is not empty
     def has_token(token_value):
         return token_value and str(token_value).strip() != ""
-    
     name_token = patient.get("name_token")
     if has_token(name_token):
         try:
@@ -245,7 +193,6 @@ async def decrypt_patient(patient_id: str, body: Dict[str, Any] = {}):
             decrypted_data["name"] = None
     else:
         print(f"   ⚠️ No name_token found in patient record (value: {repr(name_token)})")
-    
     ssn_token = patient.get("ssn_token")
     if has_token(ssn_token):
         try:
@@ -258,7 +205,6 @@ async def decrypt_patient(patient_id: str, body: Dict[str, Any] = {}):
             decrypted_data["ssn"] = None
     else:
         print(f"   ⚠️ No ssn_token found in patient record (value: {repr(ssn_token)})")
-    
     dob_token = patient.get("dob_token")
     if has_token(dob_token):
         try:
@@ -269,7 +215,6 @@ async def decrypt_patient(patient_id: str, body: Dict[str, Any] = {}):
             print(f"   ❌ Failed to decrypt dob_token: {error_msg}")
             errors["dob"] = error_msg
             decrypted_data["dob"] = None
-    
     address_token = patient.get("address_token")
     if has_token(address_token):
         try:
@@ -280,27 +225,15 @@ async def decrypt_patient(patient_id: str, body: Dict[str, Any] = {}):
             print(f"   ❌ Failed to decrypt address_token: {error_msg}")
             errors["address"] = error_msg
             decrypted_data["address"] = None
-    
-    # Return decrypted data (frontend will handle None values as "N/A")
-    # Errors are logged but not returned to avoid breaking the frontend
     if errors:
         print(f"   ⚠️ Some fields failed to decrypt: {list(errors.keys())}")
-    
     return decrypted_data
-
 @router.post("/{patient_id}/reprocess")
 async def reprocess_patient(patient_id: str):
-    """
-    Manually trigger AI processing for a patient.
-    Works even if Celery/Redis is not available.
-    """
-    # Get patient data from Sanity
     patient_data = sanity_service.get_patient(patient_id)
     if not patient_data:
         raise HTTPException(status_code=404, detail="Patient not found")
-    
     try:
-        # Process patient (synchronously if Celery not available)
         sio = get_sio()
         if CELERY_AVAILABLE and process_patient_task:
             task = process_patient_task.delay(patient_id, patient_data)
@@ -312,7 +245,6 @@ async def reprocess_patient(patient_id: str):
                 "estimated_completion": datetime.utcnow().isoformat()
             }
         else:
-            # Process synchronously
             result = await agent_service.process_patient(patient_id, patient_data)
             if sio:
                 updated_patient = sanity_service.get_patient(patient_id)
@@ -328,27 +260,19 @@ async def reprocess_patient(patient_id: str):
     except Exception as e:
         print(f"Reprocessing error: {e}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
-
 @router.post("/batch")
 async def batch_create_patients(data: Dict[str, List[Dict[str, Any]]]):
-    """
-    Create multiple patients at once.
-    """
     patients_data = data.get("patients", [])
     created = []
     failed = 0
-    
     for patient_data in patients_data:
         try:
-            # Tokenize PII
             pii_data = {
                 "name": patient_data.get("name"),
                 "ssn": patient_data.get("ssn"),
                 "dob": patient_data.get("dob"),
             }
             tokens = skyflow_service.tokenize(pii_data)
-            
-            # Create patient in Sanity
             sanity_data = {
                 "name_token": tokens.get("name_token", f"sky_n_{uuid.uuid4().hex[:6]}"),
                 "ssn_token": tokens.get("ssn_token", f"sky_s_{uuid.uuid4().hex[:6]}"),
@@ -359,49 +283,34 @@ async def batch_create_patients(data: Dict[str, List[Dict[str, Any]]]):
                 "assigned_doctor": patient_data.get("assigned_doctor", "Unassigned"),
                 "processed": False
             }
-            
             result = sanity_service.create_patient(sanity_data)
             created.append(result.get("id"))
-            
-            # Trigger async processing
             process_patient_task.delay(result.get("id"), sanity_data)
-            
         except Exception as e:
             print(f"Failed to create patient: {e}")
             failed += 1
-    
     return {
         "total": len(patients_data),
         "created": len(created),
         "failed": failed,
         "patient_ids": created
     }
-
 @router.post("/batch/upload")
 async def batch_upload(file: UploadFile = File(...)):
-    """
-    Upload and process batch of patient records from CSV file.
-    """
     import csv
     import io
-    
     content = await file.read()
     text = content.decode('utf-8')
     rows = list(csv.DictReader(io.StringIO(text)))
-    
     created = []
     failed = 0
     errors = []
-    
-    for row_num, row in enumerate(rows, start=2):  # Start at 2 (header is row 1)
+    for row_num, row in enumerate(rows, start=2):  
         try:
-            # Validate required fields
             if not row.get("name") or not row.get("ssn"):
                 failed += 1
                 errors.append(f"Row {row_num}: Missing required fields (name, ssn)")
                 continue
-            
-            # Create patient using the same logic as create_patient endpoint
             patient_data = PatientCreate(
                 name=row["name"],
                 ssn=row["ssn"],
@@ -412,16 +321,12 @@ async def batch_upload(file: UploadFile = File(...)):
                 priority=row.get("priority", "NORMAL"),
                 assigned_doctor=row.get("assigned_doctor", "Unassigned")
             )
-            
-            # Tokenize PII
             tokens = skyflow_service.tokenize({
                 "name": patient_data.name,
                 "ssn": patient_data.ssn,
                 "dob": patient_data.dob or None,
                 "address": patient_data.address or None
             })
-            
-            # Create patient in Sanity
             sanity_data = {
                 "name_token": tokens.get("name_token", ""),
                 "ssn_token": tokens.get("ssn_token", ""),
@@ -434,16 +339,12 @@ async def batch_upload(file: UploadFile = File(...)):
                 "processed": False,
                 "source": "batch_upload"
             }
-            
             result = sanity_service.create_patient(sanity_data)
             patient_id = result.get("id")
             created.append(patient_id)
-            
-            # Trigger processing (async or sync)
             if CELERY_AVAILABLE and process_patient_task:
                 process_patient_task.delay(patient_id, sanity_data)
             else:
-                # Fallback to synchronous processing
                 sio_instance = get_sio()
                 if sio_instance:
                     await sio_instance.emit('processing_started', {'patientId': patient_id})
@@ -451,43 +352,25 @@ async def batch_upload(file: UploadFile = File(...)):
                 if sio_instance:
                     updated_patient = sanity_service.get_patient(patient_id)
                     await sio_instance.emit('patient_processed', {'patientId': patient_id, 'patient': updated_patient})
-            
         except Exception as e:
             failed += 1
             errors.append(f"Row {row_num}: {str(e)}")
             print(f"Batch upload error at row {row_num}: {e}")
-    
     return {
         "batch_id": f"batch-{uuid.uuid4().hex[:6]}",
         "total_records": len(rows),
         "created": len(created),
         "failed": failed,
         "patient_ids": created,
-        "errors": errors[:10] if errors else []  # Return first 10 errors
+        "errors": errors[:10] if errors else []  
     }
-
 @router.post("/upload-document")
 async def upload_document(file: UploadFile = File(...)):
-    """
-    Upload unstructured medical document and use Skyflow Detect to find PII.
-    
-    This endpoint demonstrates the self-evolving capability:
-    - Automatically discovers PII in any document format
-    - No manual field mapping required
-    - Learns patterns as it processes more documents
-    """
     try:
-        # Read file content
         content = await file.read()
         text = content.decode('utf-8')
-        
-        # Use Skyflow Detect to find PII
         detect_result = skyflow_service.detect_pii(text)
-        
-        # Auto-tokenize discovered entities
         tokens = skyflow_service.auto_tokenize_detected(detect_result)
-        
-        # Extract condition from text (simple keyword matching for demo)
         condition = "Unknown"
         if "diabetes" in text.lower():
             condition = "Diabetes"
@@ -497,17 +380,11 @@ async def upload_document(file: UploadFile = File(...)):
             condition = "Asthma"
         elif "coronary" in text.lower() or "cardiac" in text.lower():
             condition = "Cardiac"
-        
-        # Create patient record if we found sufficient PII
         if tokens.get("name_token") and tokens.get("ssn_token"):
-            # Store original document text (with PII redacted) for AI processing
-            # Replace detected PII values with placeholders to preserve context
             redacted_text = text
             for entity in detect_result.get('entities', []):
                 if entity.get('value'):
-                    # Replace the actual PII value with a placeholder
                     redacted_text = redacted_text.replace(entity['value'], f"[{entity.get('type', 'PII')}]")
-            
             patient_doc = {
                 **tokens,
                 "condition": condition,
@@ -517,13 +394,10 @@ async def upload_document(file: UploadFile = File(...)):
                 "lab_results": [],
                 "source": "document_upload",
                 "original_filename": file.filename,
-                "original_document_text": redacted_text  # Store redacted text for AI processing
+                "original_document_text": redacted_text  
             }
-            
             created_patient = sanity_service.create_patient(patient_doc)
             patient_id = created_patient.get('id') or created_patient.get('_id')
-            
-            # Automatically trigger processing
             try:
                 if CELERY_AVAILABLE and process_patient_task:
                     try:
@@ -533,28 +407,20 @@ async def upload_document(file: UploadFile = File(...)):
                             asyncio.create_task(sio.emit('processing_started', {'patientId': patient_id}))
                     except Exception as e:
                         print(f"⚠️ Celery task failed (Redis likely down), falling back to sync processing: {e}")
-                        # Fallback to synchronous processing
                         sio = get_sio()
                         if sio:
                             await sio.emit('processing_started', {'patientId': patient_id})
-                        
                         await agent_service.process_patient(patient_id, patient_doc)
-                        
                         if sio:
                             updated_patient = sanity_service.get_patient(patient_id)
                             await sio.emit('patient_processed', {'patientId': patient_id, 'patient': updated_patient})
                         print(f"✅ Patient {patient_id} processed from document (synchronously)")
                 else:
-                    # Process synchronously (await to ensure it runs)
                     print(f"Processing patient {patient_id} from document upload synchronously...")
                     sio = get_sio()
                     if sio:
                         await sio.emit('processing_started', {'patientId': patient_id})
-                    
-                    # Actually await the processing
                     await agent_service.process_patient(patient_id, patient_doc)
-                    
-                    # Emit completion event
                     if sio:
                         updated_patient = sanity_service.get_patient(patient_id)
                         await sio.emit('patient_processed', {'patientId': patient_id, 'patient': updated_patient})
@@ -563,7 +429,6 @@ async def upload_document(file: UploadFile = File(...)):
                 print(f"❌ Error triggering processing: {e}")
                 import traceback
                 traceback.print_exc()
-            
             return {
                 "status": "success",
                 "message": "Patient record created from document",
@@ -586,7 +451,6 @@ async def upload_document(file: UploadFile = File(...)):
                 "detected_entities": detect_result.get('entities', []),
                 "required": ["name", "ssn"]
             }
-    
     except Exception as e:
         print(f"Document upload error: {e}")
         return {
@@ -594,7 +458,6 @@ async def upload_document(file: UploadFile = File(...)):
             "message": f"Failed to process document: {str(e)}",
             "detected_entities": []
         }
-
 @router.get("/analytics/stats")
 async def get_analytics():
     return {

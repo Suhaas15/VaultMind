@@ -10,16 +10,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
 interface PatientListProps {
     patients: Patient[]
     onSelectPatient: (patient: Patient) => void
     selectedPatientId?: string | null
 }
-
 export default function PatientList({ patients, onSelectPatient, selectedPatientId }: PatientListProps) {
     const [feedbackPatient, setFeedbackPatient] = useState<Patient | null>(null);
-
     if (patients.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
@@ -31,7 +28,6 @@ export default function PatientList({ patients, onSelectPatient, selectedPatient
             </div>
         )
     }
-
     return (
         <>
             <div className="divide-y divide-border">
@@ -51,7 +47,6 @@ export default function PatientList({ patients, onSelectPatient, selectedPatient
                                 }`}>
                                 {patient.processed ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5 animate-pulse" />}
                             </div>
-
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className={`font-semibold text-sm truncate ${selectedPatientId === patient.id ? 'text-primary' : 'text-foreground'}`}>
@@ -74,7 +69,6 @@ export default function PatientList({ patients, onSelectPatient, selectedPatient
                                 </div>
                             </div>
                         </div>
-
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             {patient.processed && (
                                 <Button
@@ -104,7 +98,6 @@ export default function PatientList({ patients, onSelectPatient, selectedPatient
                                     <DropdownMenuItem className="text-destructive">Delete Record</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-
                             <div className={`ml-2 ${selectedPatientId === patient.id ? 'text-primary' : 'text-muted-foreground/30'}`}>
                                 <ArrowRight className="h-4 w-4" />
                             </div>
@@ -112,7 +105,6 @@ export default function PatientList({ patients, onSelectPatient, selectedPatient
                     </div>
                 ))}
             </div>
-
             {feedbackPatient && (
                 <FeedbackDialog
                     open={!!feedbackPatient}

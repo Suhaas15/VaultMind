@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-
 export default function Dashboard() {
     const [patients, setPatients] = useState<Patient[]>([])
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
@@ -36,7 +35,6 @@ export default function Dashboard() {
     const [stats, setStats] = useState<any>(null)
     const [trend, setTrend] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-
     useEffect(() => {
         async function fetchData() {
             try {
@@ -54,31 +52,25 @@ export default function Dashboard() {
                 setLoading(false)
             }
         }
-
         fetchData()
         connectSocket()
-
         function onPatientProcessed(data: { patientId: string, patient: Patient }) {
             setPatients(prev => prev.map(p => p.id === data.patientId ? data.patient : p))
             if (selectedPatient?.id === data.patientId) {
                 setSelectedPatient(data.patient)
             }
         }
-
         function onPatientCreated(data: { patient: Patient }) {
             setPatients(prev => [data.patient, ...prev])
         }
-
         socket.on("patient_processed", onPatientProcessed)
         socket.on("patient_created", onPatientCreated)
-
         return () => {
             socket.off("patient_processed", onPatientProcessed)
             socket.off("patient_created", onPatientCreated)
             disconnectSocket()
         }
     }, [selectedPatient])
-
     const refreshPatients = async () => {
         try {
             const patientsData = await getPatients()
@@ -87,10 +79,9 @@ export default function Dashboard() {
             console.error("Failed to refresh patients:", error)
         }
     }
-
     return (
         <div className="min-h-screen bg-background flex flex-col">
-            {/* Top Navigation Bar */}
+            {}
             <header className="h-16 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50">
                 <div className="container h-full mx-auto px-4 flex items-center justify-between">
                     <div className="flex items-center gap-8">
@@ -108,7 +99,6 @@ export default function Dashboard() {
                                 </p>
                             </div>
                         </div>
-
                         <nav className="hidden md:flex items-center gap-1">
                             <Button variant="ghost" className="text-sm font-medium text-foreground/80 hover:text-primary hover:bg-primary/5">
                                 Dashboard
@@ -124,7 +114,6 @@ export default function Dashboard() {
                             </Button>
                         </nav>
                     </div>
-
                     <div className="flex items-center gap-4">
                         <div className="relative hidden md:block w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -133,12 +122,10 @@ export default function Dashboard() {
                                 className="pl-9 bg-muted/50 border-transparent focus:bg-background focus:border-primary/20 transition-all"
                             />
                         </div>
-
                         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
                             <Bell className="h-5 w-5" />
                             <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-background" />
                         </Button>
-
                         <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
@@ -158,7 +145,6 @@ export default function Dashboard() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="icon" className="ml-2" title="Reset System">
@@ -193,9 +179,8 @@ export default function Dashboard() {
                     </div>
                 </div>
             </header>
-
             <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
-                {/* Stats Row */}
+                {}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatsCard
                         title="Active Patients"
@@ -234,10 +219,9 @@ export default function Dashboard() {
                         color="purple"
                     />
                 </div>
-
-                {/* Main Content Grid */}
+                {}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-12rem)] min-h-[600px]">
-                    {/* Patient List Column */}
+                    {}
                     <Card className="lg:col-span-7 xl:col-span-8 flex flex-col border-none shadow-xl bg-card/50 backdrop-blur-sm ring-1 ring-border">
                         <CardHeader className="border-b px-6 py-4 flex flex-row items-center justify-between">
                             <div>
@@ -272,8 +256,7 @@ export default function Dashboard() {
                             )}
                         </div>
                     </Card>
-
-                    {/* Detail View Column */}
+                    {}
                     <div className="lg:col-span-5 xl:col-span-4 h-full">
                         <TokenViewer patient={selectedPatient} />
                     </div>
@@ -282,7 +265,6 @@ export default function Dashboard() {
         </div>
     )
 }
-
 function StatsCard({ title, value, label, icon: Icon, trend, trendUp, color }: any) {
     const colorStyles = {
         blue: "text-blue-600 bg-blue-50 dark:bg-blue-900/20",
@@ -290,7 +272,6 @@ function StatsCard({ title, value, label, icon: Icon, trend, trendUp, color }: a
         amber: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
         purple: "text-purple-600 bg-purple-50 dark:bg-purple-900/20",
     }
-
     return (
         <Card className="border-none shadow-sm hover:shadow-md transition-all bg-card/50 backdrop-blur-sm ring-1 ring-border">
             <CardContent className="p-6">

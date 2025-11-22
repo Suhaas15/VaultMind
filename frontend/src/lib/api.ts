@@ -1,7 +1,5 @@
 import type { Patient } from "@/types"
-
 const API_URL = "http://localhost:8000/api"
-
 export async function getPatients(): Promise<Patient[]> {
     const response = await fetch(`${API_URL}/patients`)
     if (!response.ok) {
@@ -10,7 +8,6 @@ export async function getPatients(): Promise<Patient[]> {
     const data = await response.json()
     return data.patients || []
 }
-
 export async function getStats() {
     const response = await fetch(`${API_URL}/feedback/stats`)
     if (!response.ok) {
@@ -18,7 +15,6 @@ export async function getStats() {
     }
     return response.json()
 }
-
 export async function getImprovementTrend() {
     const response = await fetch(`${API_URL}/feedback/improvement-trend`)
     if (!response.ok) {
@@ -26,7 +22,6 @@ export async function getImprovementTrend() {
     }
     return response.json()
 }
-
 export async function resetSystem() {
     const response = await fetch(`${API_URL}/patients/reset`, {
         method: 'DELETE'
@@ -36,7 +31,6 @@ export async function resetSystem() {
     }
     return response.json()
 }
-
 export async function decryptPatient(patientId: string) {
     const response = await fetch(`${API_URL}/patients/${patientId}/decrypt`, {
         method: 'POST',

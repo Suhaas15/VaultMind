@@ -5,16 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Lock, Unlock } from "lucide-react"
 import { decryptPatient } from "@/lib/api"
-
 interface TokenViewerProps {
     patient: Patient | null
 }
-
 export default function TokenViewer({ patient }: TokenViewerProps) {
     const [isDecrypted, setIsDecrypted] = useState(false)
     const [decryptedData, setDecryptedData] = useState<{ name?: string; ssn?: string; dob?: string; address?: string } | null>(null)
     const [decrypting, setDecrypting] = useState(false)
-
     if (!patient) {
         return (
             <Card className="h-full flex items-center justify-center text-muted-foreground">
@@ -25,26 +22,27 @@ export default function TokenViewer({ patient }: TokenViewerProps) {
             </Card>
         )
     }
-
     return (
         <Card className="h-full flex flex-col">
             <CardHeader className="border-b bg-muted/50">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            {patient.name_token}
-                            <Badge variant="outline" className="font-mono text-xs">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        <CardTitle className="flex items-center gap-2 truncate">
+                            <span className="truncate">
+                                {isDecrypted && decryptedData?.name ? decryptedData.name : patient.name_token}
+                            </span>
+                            <Badge variant="outline" className="font-mono text-xs shrink-0">
                                 {patient.id}
                             </Badge>
                         </CardTitle>
-                        <CardDescription className="mt-1">
+                        <CardDescription className="mt-1 truncate">
                             {patient.department} • {patient.assigned_doctor}
                         </CardDescription>
                     </div>
                     <Button
                         variant="outline"
                         size="sm"
-                        className="gap-2"
+                        className="gap-2 shrink-0"
                         onClick={async () => {
                             if (!isDecrypted && patient) {
                                 setDecrypting(true)
@@ -53,8 +51,6 @@ export default function TokenViewer({ patient }: TokenViewerProps) {
                                     console.log("Decrypted data received:", data)
                                     setDecryptedData(data)
                                     setIsDecrypted(true)
-                                    
-                                    // Show warning if some fields are missing
                                     if (!data.name && !data.ssn) {
                                         alert("Warning: Could not decrypt any PII fields. The patient record may not have tokens stored, or Skyflow detokenization failed. Check the backend logs for details.")
                                     }
@@ -79,17 +75,17 @@ export default function TokenViewer({ patient }: TokenViewerProps) {
                     </Button>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 p-6 space-y-6">
+            <CardContent className="flex-1 p-6 space-y-6 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-0">
                         <label className="text-xs font-medium text-muted-foreground">Name</label>
-                        <div className={`p-2 rounded-md border font-mono text-sm ${isDecrypted ? 'bg-red-50 border-red-200 text-red-900' : 'bg-muted/50'}`}>
+                        <div className={`p-2 rounded-md border font-mono text-sm break-all ${isDecrypted ? 'bg-red-50 border-red-200 text-red-900' : 'bg-muted/50'}`}>
                             {isDecrypted ? (decryptedData?.name || "N/A") : patient.name_token}
                         </div>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-0">
                         <label className="text-xs font-medium text-muted-foreground">SSN</label>
-                        <div className={`p-2 rounded-md border font-mono text-sm ${isDecrypted ? 'bg-red-50 border-red-200 text-red-900' : 'bg-muted/50'}`}>
+                        <div className={`p-2 rounded-md border font-mono text-sm break-all ${isDecrypted ? 'bg-red-50 border-red-200 text-red-900' : 'bg-muted/50'}`}>
                             {isDecrypted ? (decryptedData?.ssn || "N/A") : patient.ssn_token}
                         </div>
                     </div>
@@ -106,7 +102,6 @@ export default function TokenViewer({ patient }: TokenViewerProps) {
                         </div>
                     </div>
                 </div>
-
                 <div className="space-y-2">
                     <label className="text-sm font-medium">AI Clinical Summary</label>
                     <div className="rounded-md border bg-muted/30 p-4 text-sm leading-relaxed">
